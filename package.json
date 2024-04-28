@@ -1,0 +1,42 @@
+{
+  "name": "@dao-dao/cosmiframe",
+  "version": "0.0.1",
+  "description": "Facilitate iframe message passthrough for wallet connections",
+  "author": "Noah Saso <noah@daodao.zone>",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "format": "eslint . --fix",
+    "build": "tsup",
+    "build:watch": "tsup --watch"
+  },
+  "license": "BSD-3-Clause-Clear",
+  "devDependencies": {
+    "@cosmjs/amino": "^0.32.3",
+    "@cosmjs/proto-signing": "^0.32.3",
+    "@swc/core": "^1.4.16",
+    "@types/uuid": "^9.0.8",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-unused-imports": "^3.0.0",
+    "prettier": "^3.2.4",
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1"
+  },
+  "peerDependencies": {
+    "@cosmjs/amino": ">= ^0.32",
+    "@cosmjs/proto-signing": ">= ^0.32"
+  }
+}
