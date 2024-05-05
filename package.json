@@ -1,6 +1,6 @@
 {
   "name": "@dao-dao/cosmiframe",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Facilitate iframe message passthrough for wallet connections",
   "author": "Noah Saso <noah@daodao.zone>",
   "main": "./dist/index.js",
@@ -19,6 +19,7 @@
   "devDependencies": {
     "@cosmjs/amino": "^0.32.3",
     "@cosmjs/proto-signing": "^0.32.3",
+    "@keplr-wallet/types": "^0.12.83",
     "@swc/core": "^1.4.16",
     "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^6.19.1",

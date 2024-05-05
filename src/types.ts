@@ -122,9 +122,12 @@ export type ListenOptions = {
   /**
    * Overrides applied to non-signer message requests.
    */
-  nonSignerOverrides?: Overrides | (() => Overrides)
+  nonSignerOverrides?:
+    | Overrides
+    | (() => Overrides)
+    | (() => Promise<Overrides>)
   /**
    * Overrides applied to signer message requests.
    */
-  signerOverrides?: Overrides | (() => Overrides)
+  signerOverrides?: Overrides | (() => Overrides) | (() => Promise<Overrides>)
 }

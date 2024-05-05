@@ -1,14 +1,10 @@
-import {
-  AminoSignResponse,
-  OfflineAminoSigner,
-  StdSignDoc,
-} from '@cosmjs/amino'
-import {
-  AccountData,
-  DirectSignResponse,
-  OfflineDirectSigner,
-} from '@cosmjs/proto-signing'
+import { Keplr, SecretUtils } from '@keplr-wallet/types'
 
+import {
+  CosmiframeAminoSigner,
+  CosmiframeDirectSigner,
+  CosmiframeEitherSigner,
+} from './signers'
 import {
   ListenOptions,
   MethodCallResultMessage,
@@ -31,15 +27,36 @@ export class Cosmiframe {
 
   constructor() {
     this.p = new Proxy(
-      {},
       {
-        get:
-          (_, name) =>
-          <T = any>(...params: any[]) =>
-            callParentMethod<T>({
-              method: name.toString(),
-              params,
-            }),
+        // `getEnigmaUtils` is expected to return an object with functions;
+        // override them with proxied functions instead. This follows Keplr's
+        // SecretUtils interface.
+        getEnigmaUtils: (chainId: string) =>
+          ({
+            getPubkey: () => this.p.getEnigmaPubKey(chainId),
+            decrypt: (...params) => this.p.enigmaDecrypt(chainId, ...params),
+            encrypt: (...params) => this.p.enigmaEncrypt(chainId, ...params),
+            getTxEncryptionKey: (...params) =>
+              this.p.getEnigmaTxEncryptionKey(chainId, ...params),
+          }) as SecretUtils,
+      } as any,
+      {
+        get: (obj, name) =>
+          // Override variables.
+          name in obj && typeof obj[name as keyof typeof obj] !== 'function'
+            ? obj[name as keyof typeof obj]
+            : // Override functions.
+              <T = any>(...params: any[]) =>
+                name in obj &&
+                typeof obj[name as keyof typeof obj] === 'function'
+                  ? (obj[name as keyof typeof obj] as (...params: any[]) => T)(
+                      ...params
+                    )
+                  : // Proxy to parent if not defined above.
+                    callParentMethod<T>({
+                      method: name.toString(),
+                      params,
+                    }),
       }
     )
   }
@@ -54,12 +71,58 @@ export class Cosmiframe {
   }
 
   /**
+   * Get client that conforms to Keplr's interface.
+   */
+  getKeplrClient(): Keplr {
+    const proxy = new Proxy(
+      {
+        version: 'cosmiframe',
+        mode: 'extension',
+        defaultOptions: {},
+        getOfflineSigner: this.getOfflineSigner.bind(this),
+        getOfflineSignerOnlyAmino: this.getOfflineSignerAmino.bind(this),
+        getOfflineSignerAuto: (chainId) =>
+          Promise.resolve(this.getOfflineSigner(chainId)),
+        // `getEnigmaUtils` is expected to return an object with functions;
+        // override them with proxied functions instead.
+        getEnigmaUtils: (chainId: string) => ({
+          getPubkey: () => proxy.getEnigmaPubKey(chainId),
+          decrypt: (...params) => proxy.enigmaDecrypt(chainId, ...params),
+          encrypt: (...params) => proxy.enigmaEncrypt(chainId, ...params),
+          getTxEncryptionKey: (...params) =>
+            proxy.getEnigmaTxEncryptionKey(chainId, ...params),
+        }),
+      } as Partial<Keplr>,
+      {
+        get: (obj, name) =>
+          // Override variables.
+          name in obj && typeof obj[name as keyof typeof obj] !== 'function'
+            ? obj[name as keyof typeof obj]
+            : // Override functions.
+              <T = any>(...params: any[]) =>
+                name in obj &&
+                typeof obj[name as keyof typeof obj] === 'function'
+                  ? (obj[name as keyof typeof obj] as (...params: any[]) => T)(
+                      ...params
+                    )
+                  : // Proxy to parent if not defined above.
+                    callParentMethod<T>({
+                      method: name.toString(),
+                      params,
+                    }),
+      }
+    ) as Keplr
+
+    return proxy
+  }
+
+  /**
    * Get an offline signer with both direct and amino sign functions that
    * forwards requests to the parent frame. The parent frame must be listening
    * (using the `listen` function). This should be used by the iframe.
    */
-  getOfflineSigner(chainId: string): IframeEitherSigner {
-    return new IframeEitherSigner(chainId)
+  getOfflineSigner(chainId: string): CosmiframeEitherSigner {
+    return new CosmiframeEitherSigner(chainId)
   }
 
   /**
@@ -67,8 +130,8 @@ export class Cosmiframe {
    * parent frame must be listening (using the `listen` function). This should
    * be used by the iframe.
    */
-  getOfflineSignerAmino(chainId: string): IframeAminoSigner {
-    return new IframeAminoSigner(chainId)
+  getOfflineSignerAmino(chainId: string): CosmiframeAminoSigner {
+    return new CosmiframeAminoSigner(chainId)
   }
 
   /**
@@ -76,8 +139,8 @@ export class Cosmiframe {
    * The parent frame must be listening (using the `listen` function). This
    * should be used by the iframe.
    */
-  getOfflineSignerDirect(chainId: string): IframeDirectSigner {
-    return new IframeDirectSigner(chainId)
+  getOfflineSignerDirect(chainId: string): CosmiframeDirectSigner {
+    return new CosmiframeDirectSigner(chainId)
   }
 
   /**
@@ -136,7 +199,7 @@ export class Cosmiframe {
           // Try signer override method.
           const overrides =
             typeof signerOverrides === 'function'
-              ? signerOverrides()
+              ? await signerOverrides()
               : signerOverrides
           if (overrides && method in overrides) {
             const handledMsg = processOverrideHandler(
@@ -175,7 +238,7 @@ export class Cosmiframe {
           // Try override method.
           const overrides =
             typeof nonSignerOverrides === 'function'
-              ? nonSignerOverrides()
+              ? await nonSignerOverrides()
               : nonSignerOverrides
 
           if (overrides && method in overrides) {
@@ -222,104 +285,5 @@ export class Cosmiframe {
 
     // Return a function to stop listening.
     return () => window.removeEventListener('message', listener)
-  }
-}
-
-export class IframeDirectSigner implements OfflineDirectSigner {
-  constructor(public chainId: string) {}
-
-  async getAccounts(): Promise<readonly AccountData[]> {
-    return callParentMethod<readonly AccountData[]>({
-      method: 'getAccounts',
-      params: [],
-      chainId: this.chainId,
-      signerType: 'direct',
-    })
-  }
-
-  async signDirect(
-    signerAddress: string,
-    signDoc: DirectSignResponse['signed']
-  ): Promise<DirectSignResponse> {
-    return callParentMethod<DirectSignResponse>({
-      method: 'signDirect',
-      params: [signerAddress, signDoc],
-      chainId: this.chainId,
-      signerType: 'direct',
-    })
-  }
-}
-
-export class IframeAminoSigner implements OfflineAminoSigner {
-  constructor(public chainId: string) {}
-
-  async getAccounts(): Promise<readonly AccountData[]> {
-    return callParentMethod<readonly AccountData[]>({
-      method: 'getAccounts',
-      params: [],
-      chainId: this.chainId,
-      signerType: 'amino',
-    })
-  }
-
-  async signAmino(
-    signerAddress: string,
-    signDoc: StdSignDoc
-  ): Promise<AminoSignResponse> {
-    return callParentMethod<AminoSignResponse>({
-      method: 'signAmino',
-      params: [signerAddress, signDoc],
-      chainId: this.chainId,
-      signerType: 'amino',
-    })
-  }
-}
-
-export class IframeEitherSigner
-  implements OfflineDirectSigner, OfflineAminoSigner
-{
-  constructor(public chainId: string) {}
-
-  async getAccounts(): Promise<readonly AccountData[]> {
-    // Try amino first, falling back to direct.
-    try {
-      return await callParentMethod<readonly AccountData[]>({
-        method: 'getAccounts',
-        params: [],
-        chainId: this.chainId,
-        signerType: 'amino',
-      })
-    } catch {
-      return await callParentMethod<readonly AccountData[]>({
-        method: 'getAccounts',
-        params: [],
-        chainId: this.chainId,
-        signerType: 'direct',
-      })
-    }
-  }
-
-  async signDirect(
-    signerAddress: string,
-    signDoc: DirectSignResponse['signed']
-  ): Promise<DirectSignResponse> {
-    return callParentMethod<DirectSignResponse>({
-      method: 'signDirect',
-      params: [signerAddress, signDoc],
-      chainId: this.chainId,
-      signerType: 'direct',
-    })
-  }
-
-  async signAmino(
-    signerAddress: string,
-    signDoc: StdSignDoc
-  ): Promise<AminoSignResponse> {
-    return callParentMethod<AminoSignResponse>({
-      method: 'signAmino',
-      params: [signerAddress, signDoc],
-      chainId: this.chainId,
-      signerType: 'amino',
-    })
   }
 }
