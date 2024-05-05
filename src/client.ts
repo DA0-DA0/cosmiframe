@@ -54,6 +54,15 @@ export class Cosmiframe {
   }
 
   /**
+   * Get an offline signer with both direct and amino sign functions that
+   * forwards requests to the parent frame. The parent frame must be listening
+   * (using the `listen` function). This should be used by the iframe.
+   */
+  getOfflineSigner(chainId: string): IframeEitherSigner {
+    return new IframeEitherSigner(chainId)
+  }
+
+  /**
    * Get an offline amino signer that forwards requests to the parent frame. The
    * parent frame must be listening (using the `listen` function). This should
    * be used by the iframe.
@@ -250,6 +259,55 @@ export class IframeAminoSigner implements OfflineAminoSigner {
       params: [],
       chainId: this.chainId,
       signerType: 'amino',
+    })
+  }
+
+  async signAmino(
+    signerAddress: string,
+    signDoc: StdSignDoc
+  ): Promise<AminoSignResponse> {
+    return callParentMethod<AminoSignResponse>({
+      method: 'signAmino',
+      params: [signerAddress, signDoc],
+      chainId: this.chainId,
+      signerType: 'amino',
+    })
+  }
+}
+
+export class IframeEitherSigner
+  implements OfflineDirectSigner, OfflineAminoSigner
+{
+  constructor(public chainId: string) {}
+
+  async getAccounts(): Promise<readonly AccountData[]> {
+    // Try amino first, falling back to direct.
+    try {
+      return await callParentMethod<readonly AccountData[]>({
+        method: 'getAccounts',
+        params: [],
+        chainId: this.chainId,
+        signerType: 'amino',
+      })
+    } catch {
+      return await callParentMethod<readonly AccountData[]>({
+        method: 'getAccounts',
+        params: [],
+        chainId: this.chainId,
+        signerType: 'direct',
+      })
+    }
+  }
+
+  async signDirect(
+    signerAddress: string,
+    signDoc: DirectSignResponse['signed']
+  ): Promise<DirectSignResponse> {
+    return callParentMethod<DirectSignResponse>({
+      method: 'signDirect',
+      params: [signerAddress, signDoc],
+      chainId: this.chainId,
+      signerType: 'direct',
     })
   }
 
