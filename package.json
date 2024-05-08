@@ -1,7 +1,7 @@
 {
   "name": "@dao-dao/cosmiframe",
-  "version": "0.0.4",
-  "description": "Facilitate iframe message passthrough for wallet connections",
+  "version": "0.1.0",
+  "description": "Facilitate iframe message passthrough for Cosmos wallets",
   "author": "Noah Saso <noah@daodao.zone>",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

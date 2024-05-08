@@ -22,6 +22,9 @@ export type RequestMethodCallMessage = {
    * @deprecated Backwards compatibility.
    */
   signType?: SignerType
+
+  // For internal messages.
+  internal?: boolean
 }
 
 export type RequestMethodCallMessageNoId = Omit<RequestMethodCallMessage, 'id'>
@@ -130,4 +133,31 @@ export type ListenOptions = {
    * Overrides applied to signer message requests.
    */
   signerOverrides?: Overrides | (() => Overrides) | (() => Promise<Overrides>)
+  /**
+   * Restrict iframe origins that are allowed to connect to this listening
+   * instance of Cosmiframe. If undefined or empty, all origins are allowed.
+   *
+   * It is safe to allow all origins since the current window is the listening
+   * parent and is responsible for handling signing requests from the iframe.
+   * The iframe, on the other hand, should not trust us.
+   */
+  origins?: string[]
+  /**
+   * Optionally set a name and imageUrl that represent the parent window to be
+   * shown by the iframe.
+   */
+  metadata?: ParentMetadata
+}
+
+export type ParentMetadata = {
+  name?: string
+  imageUrl?: string
+}
+
+/**
+ * Internal methods.
+ */
+export enum InternalMethod {
+  IsCosmiframe = 'isCosmiframe',
+  GetMetadata = 'getMetadata',
 }

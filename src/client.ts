@@ -1,18 +1,31 @@
 import { Keplr, SecretUtils } from '@keplr-wallet/types'
 
+import { CosmiframeTimeoutError } from './error'
 import {
   CosmiframeAminoSigner,
   CosmiframeDirectSigner,
   CosmiframeEitherSigner,
 } from './signers'
 import {
+  InternalMethod,
   ListenOptions,
   MethodCallResultMessage,
+  ParentMetadata,
   RequestMethodCallMessage,
 } from './types'
-import { callParentMethod, processOverrideHandler } from './utils'
+import {
+  UNSAFE_ALLOW_ANY_ORIGIN,
+  callParentMethod,
+  isInIframe,
+  processOverrideHandler,
+} from './utils'
 
 export class Cosmiframe {
+  /**
+   * Parent origins we are allowed to communicate with.
+   */
+  #allowedOrigins: string[]
+
   /**
    * Proxy object that can be used to call methods on the parent frame. This
    * serves as a passthrough and is a convenient alternative to using
@@ -25,7 +38,31 @@ export class Cosmiframe {
    */
   public p: { [key: string]: <T = any>(...params: any[]) => Promise<T> }
 
-  constructor() {
+  constructor(
+    /**
+     * List of allowed parent origins.
+     *
+     * In order to allow all origins, you must explicitly pass in the string
+     * `UNSAFE_ALLOW_ANY_ORIGIN`. Do not do this. It is very unsafe.
+     */
+    allowedParentOrigins: string[]
+  ) {
+    if (!allowedParentOrigins.length) {
+      throw new Error('You must explicitly allow parent origins.')
+    }
+
+    if (allowedParentOrigins.includes('*')) {
+      throw new Error(
+        'It is very unsafe to allow all origins because a controlling app has the power to manipulate messages before they are signed. If you really want to do this, pass in `UNSAFE_ALLOW_ANY_ORIGIN`.'
+      )
+    }
+
+    this.#allowedOrigins = allowedParentOrigins.includes(
+      UNSAFE_ALLOW_ANY_ORIGIN
+    )
+      ? ['*']
+      : [...allowedParentOrigins]
+
     this.p = new Proxy(
       {
         // `getEnigmaUtils` is expected to return an object with functions;
@@ -53,7 +90,7 @@ export class Cosmiframe {
                       ...params
                     )
                   : // Proxy to parent if not defined above.
-                    callParentMethod<T>({
+                    this.callParentMethod<T>({
                       method: name.toString(),
                       params,
                     }),
@@ -65,9 +102,63 @@ export class Cosmiframe {
    * Call a method on the parent frame. This should be used by the iframe.
    */
   callParentMethod<T = any>(
-    options: Pick<RequestMethodCallMessage, 'method' | 'params'>
+    options: Pick<RequestMethodCallMessage, 'method' | 'params' | 'internal'>,
+    /**
+     * The timeout in milliseconds after which to reject the promise and stop
+     * listening if the parent has not responded. If undefined, no timeout.
+     *
+     * Defaults to no timeout.
+     */
+    timeout?: number
   ): Promise<T> {
-    return callParentMethod<T>(options)
+    return callParentMethod<T>(options, this.#allowedOrigins, timeout)
+  }
+
+  /**
+   * Returns whether or not Cosmiframe is ready to use, meaning all of these are
+   * true:
+   * - The current app is being used in an iframe.
+   * - The parent window is running Cosmiframe.
+   * - The parent window is one of the allowed origins.
+   *
+   * This should be used by the iframe.
+   */
+  async isReady(): Promise<boolean> {
+    if (!isInIframe()) {
+      return false
+    }
+
+    return this.callParentMethod<boolean>(
+      {
+        internal: true,
+        method: InternalMethod.IsCosmiframe,
+        params: [],
+      },
+      // If the parent is listening, it should respond immediately, so a short
+      // timeout should suffice.
+      500
+    ).catch((err) =>
+      // If the parent has not responded, assume it is not ready. Otherwise,
+      // reject with the error to the caller.
+      err instanceof CosmiframeTimeoutError ? false : Promise.reject(err)
+    )
+  }
+
+  /**
+   * Returns the metadata set by the parent when it started listening. This
+   * should be used by the iframe to display information about the parent.
+   */
+  async getMetadata(): Promise<ParentMetadata | null> {
+    return this.callParentMethod<ParentMetadata | null>(
+      {
+        internal: true,
+        method: InternalMethod.GetMetadata,
+        params: [],
+      },
+      // If the parent is listening, it should respond immediately, so a short
+      // timeout should suffice.
+      500
+    )
   }
 
   /**
@@ -106,7 +197,7 @@ export class Cosmiframe {
                       ...params
                     )
                   : // Proxy to parent if not defined above.
-                    callParentMethod<T>({
+                    this.callParentMethod<T>({
                       method: name.toString(),
                       params,
                     }),
@@ -122,7 +213,7 @@ export class Cosmiframe {
    * (using the `listen` function). This should be used by the iframe.
    */
   getOfflineSigner(chainId: string): CosmiframeEitherSigner {
-    return new CosmiframeEitherSigner(chainId)
+    return new CosmiframeEitherSigner(chainId, this.#allowedOrigins)
   }
 
   /**
@@ -131,7 +222,7 @@ export class Cosmiframe {
    * be used by the iframe.
    */
   getOfflineSignerAmino(chainId: string): CosmiframeAminoSigner {
-    return new CosmiframeAminoSigner(chainId)
+    return new CosmiframeAminoSigner(chainId, this.#allowedOrigins)
   }
 
   /**
@@ -140,14 +231,14 @@ export class Cosmiframe {
    * should be used by the iframe.
    */
   getOfflineSignerDirect(chainId: string): CosmiframeDirectSigner {
-    return new CosmiframeDirectSigner(chainId)
+    return new CosmiframeDirectSigner(chainId, this.#allowedOrigins)
   }
 
   /**
    * Listen for requests from the provided iframe. This should be used by the
    * parent. Returns a function that can be called to stop listening.
    */
-  listen(options: ListenOptions): () => void {
+  static listen(options: ListenOptions): () => void {
     const {
       iframe,
       target,
@@ -155,12 +246,22 @@ export class Cosmiframe {
       getOfflineSignerAmino,
       nonSignerOverrides,
       signerOverrides,
+      origins: _origins,
+      metadata,
     } = options
+
+    const origins = _origins?.length ? _origins : ['*']
+
+    const internalMethods: Record<InternalMethod, (...params: any[]) => any> = {
+      [InternalMethod.IsCosmiframe]: () => true,
+      [InternalMethod.GetMetadata]: () => metadata || null,
+    }
 
     const listener = async ({
       source,
+      origin,
       data,
-    }: MessageEvent<RequestMethodCallMessage>) => {
+    }: MessageEvent<RequestMethodCallMessage | string>) => {
       // Verify iframe window exists.
       if (!iframe.contentWindow) {
         throw new Error('Iframe contentWindow does not exist.')
@@ -168,6 +269,11 @@ export class Cosmiframe {
 
       // Verify event is coming from the iframe.
       if (source !== iframe.contentWindow) {
+        return
+      }
+
+      // Verify origin is allowed.
+      if (!origins.includes('*') && !origins.includes(origin)) {
         return
       }
 
@@ -182,7 +288,7 @@ export class Cosmiframe {
         return
       }
 
-      const { id, params, chainId, signType } = data
+      const { id, params, chainId, signType, internal } = data
       let { method, signerType } = data
 
       // Backwards compatibility.
@@ -191,7 +297,25 @@ export class Cosmiframe {
 
       let msg: Omit<MethodCallResultMessage, 'id'> | undefined
       try {
-        if (signerType) {
+        if (internal) {
+          if (
+            typeof internalMethods[method as keyof typeof internalMethods] !==
+            'function'
+          ) {
+            throw new Error(`Unknown internal method: ${method}`)
+          }
+
+          const response = await (
+            internalMethods[method as keyof typeof internalMethods] as (
+              ...params: any[]
+            ) => any
+          )(...params)
+
+          msg = {
+            type: 'success',
+            response,
+          }
+        } else if (signerType) {
           if (!chainId) {
             throw new Error('Missing chainId in signer message request')
           }
@@ -271,12 +395,13 @@ export class Cosmiframe {
         }
       }
 
-      iframe.contentWindow.postMessage(
+      // Send back to same origin.
+      iframe.contentWindow?.postMessage(
         {
           ...msg,
           id,
         },
-        '*'
+        origin
       )
     }
 
