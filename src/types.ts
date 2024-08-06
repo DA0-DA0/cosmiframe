@@ -54,6 +54,21 @@ export type MethodCallResultMessageNoId<T = any> = Omit<
 >
 
 /**
+ * The result with metadata from calling a parent method.
+ */
+export type CalledParentMethodResult<T> = {
+  /**
+   * The parent's result for the requested method.
+   */
+  result: T
+  /**
+   * The origin of the parent response message, which should be the parent's
+   * origin. This is pulled directly from the `MessageEvent`.
+   */
+  origin: string
+}
+
+/**
  * The override handler that throws an error, defaulting to "Handled by outer
  * wallet."
  */

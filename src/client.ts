@@ -7,6 +7,7 @@ import {
   CosmiframeEitherSigner,
 } from './signers'
 import {
+  CalledParentMethodResult,
   InternalMethod,
   ListenOptions,
   MethodCallResultMessage,
@@ -93,13 +94,15 @@ export class Cosmiframe {
                     this.callParentMethod<T>({
                       method: name.toString(),
                       params,
-                    }),
+                    }).then(({ result }) => result),
       }
     )
   }
 
   /**
-   * Call a method on the parent frame. This should be used by the iframe.
+   * Call a method on the parent frame, returning the result with metadata, such
+   * as the response message origin, which should be the parent frame origin.
+   * This should be used by the iframe.
    */
   callParentMethod<T = any>(
     options: Pick<RequestMethodCallMessage, 'method' | 'params' | 'internal'>,
@@ -110,7 +113,7 @@ export class Cosmiframe {
      * Defaults to no timeout.
      */
     timeout?: number
-  ): Promise<T> {
+  ): Promise<CalledParentMethodResult<T>> {
     return callParentMethod<T>(options, this.#allowedOrigins, timeout)
   }
 
@@ -121,27 +124,39 @@ export class Cosmiframe {
    * - The parent window is running Cosmiframe.
    * - The parent window is one of the allowed origins.
    *
+   * If ready to use, this returns the origin of the parent frame that
+   * acknowledged the request. If no origin is set for some reason, this returns
+   * true. Otherwise, this returns false.
+   *
    * This should be used by the iframe.
    */
-  async isReady(): Promise<boolean> {
+  async isReady(): Promise<string | boolean> {
     if (!isInIframe()) {
       return false
     }
 
-    return this.callParentMethod<boolean>(
-      {
-        internal: true,
-        method: InternalMethod.IsCosmiframe,
-        params: [],
-      },
-      // If the parent is listening, it should respond immediately, so a short
-      // timeout should suffice.
-      500
-    ).catch((err) =>
+    try {
+      const { origin, result } = await this.callParentMethod<boolean>(
+        {
+          internal: true,
+          method: InternalMethod.IsCosmiframe,
+          params: [],
+        },
+        // If the parent is listening, it should respond immediately, so a
+        // short timeout should suffice.
+        500
+      )
+
+      return origin || result
+    } catch (err) {
       // If the parent has not responded, assume it is not ready. Otherwise,
-      // reject with the error to the caller.
-      err instanceof CosmiframeTimeoutError ? false : Promise.reject(err)
-    )
+      // rethrow the error.
+      if (err instanceof CosmiframeTimeoutError) {
+        return false
+      }
+
+      throw err
+    }
   }
 
   /**
@@ -149,16 +164,18 @@ export class Cosmiframe {
    * should be used by the iframe to display information about the parent.
    */
   async getMetadata(): Promise<ParentMetadata | null> {
-    return this.callParentMethod<ParentMetadata | null>(
-      {
-        internal: true,
-        method: InternalMethod.GetMetadata,
-        params: [],
-      },
-      // If the parent is listening, it should respond immediately, so a short
-      // timeout should suffice.
-      500
-    )
+    return (
+      await this.callParentMethod<ParentMetadata | null>(
+        {
+          internal: true,
+          method: InternalMethod.GetMetadata,
+          params: [],
+        },
+        // If the parent is listening, it should respond immediately, so a short
+        // timeout should suffice.
+        500
+      )
+    ).result
   }
 
   /**
@@ -200,7 +217,7 @@ export class Cosmiframe {
                     this.callParentMethod<T>({
                       method: name.toString(),
                       params,
-                    }),
+                    }).then(({ result }) => result),
       }
     ) as Keplr
 

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { CosmiframeTimeoutError } from './error'
 import {
+  CalledParentMethodResult,
   MethodCallResultMessageNoId,
   OverrideHandler,
   RequestMethodCallMessageNoId,
@@ -28,8 +29,8 @@ export const callParentMethod = <T = any>(
    * Defaults to no timeout.
    */
   timeout?: number
-): Promise<T> =>
-  new Promise<any>((resolve, reject) => {
+): Promise<CalledParentMethodResult<T>> =>
+  new Promise<CalledParentMethodResult<T>>((resolve, reject) => {
     let timeoutId: number | null = null
     const id = uuidv4()
 
@@ -55,7 +56,10 @@ export const callParentMethod = <T = any>(
       }
 
       if (data.type === 'success') {
-        resolve(data.response)
+        resolve({
+          result: data.response,
+          origin,
+        })
       } else {
         reject(new Error(data.error))
       }

@@ -25,30 +25,34 @@ export class CosmiframeDirectSigner implements OfflineDirectSigner {
   }
 
   async getAccounts(): Promise<readonly AccountData[]> {
-    return callParentMethod<readonly AccountData[]>(
-      {
-        method: 'getAccounts',
-        params: [],
-        chainId: this.chainId,
-        signerType: 'direct',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<readonly AccountData[]>(
+        {
+          method: 'getAccounts',
+          params: [],
+          chainId: this.chainId,
+          signerType: 'direct',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 
   async signDirect(
     signerAddress: string,
     signDoc: DirectSignResponse['signed']
   ): Promise<DirectSignResponse> {
-    return callParentMethod<DirectSignResponse>(
-      {
-        method: 'signDirect',
-        params: [signerAddress, signDoc],
-        chainId: this.chainId,
-        signerType: 'direct',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<DirectSignResponse>(
+        {
+          method: 'signDirect',
+          params: [signerAddress, signDoc],
+          chainId: this.chainId,
+          signerType: 'direct',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 }
 
@@ -66,30 +70,34 @@ export class CosmiframeAminoSigner implements OfflineAminoSigner {
   }
 
   async getAccounts(): Promise<readonly AccountData[]> {
-    return callParentMethod<readonly AccountData[]>(
-      {
-        method: 'getAccounts',
-        params: [],
-        chainId: this.chainId,
-        signerType: 'amino',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<readonly AccountData[]>(
+        {
+          method: 'getAccounts',
+          params: [],
+          chainId: this.chainId,
+          signerType: 'amino',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 
   async signAmino(
     signerAddress: string,
     signDoc: StdSignDoc
   ): Promise<AminoSignResponse> {
-    return callParentMethod<AminoSignResponse>(
-      {
-        method: 'signAmino',
-        params: [signerAddress, signDoc],
-        chainId: this.chainId,
-        signerType: 'amino',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<AminoSignResponse>(
+        {
+          method: 'signAmino',
+          params: [signerAddress, signDoc],
+          chainId: this.chainId,
+          signerType: 'amino',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 }
 
@@ -111,25 +119,29 @@ export class CosmiframeEitherSigner
   async getAccounts(): Promise<readonly AccountData[]> {
     // Try amino first, falling back to direct.
     try {
-      return await callParentMethod<readonly AccountData[]>(
-        {
-          method: 'getAccounts',
-          params: [],
-          chainId: this.chainId,
-          signerType: 'amino',
-        },
-        this.#allowedOrigins
-      )
+      return (
+        await callParentMethod<readonly AccountData[]>(
+          {
+            method: 'getAccounts',
+            params: [],
+            chainId: this.chainId,
+            signerType: 'amino',
+          },
+          this.#allowedOrigins
+        )
+      ).result
     } catch {
-      return await callParentMethod<readonly AccountData[]>(
-        {
-          method: 'getAccounts',
-          params: [],
-          chainId: this.chainId,
-          signerType: 'direct',
-        },
-        this.#allowedOrigins
-      )
+      return (
+        await callParentMethod<readonly AccountData[]>(
+          {
+            method: 'getAccounts',
+            params: [],
+            chainId: this.chainId,
+            signerType: 'direct',
+          },
+          this.#allowedOrigins
+        )
+      ).result
     }
   }
 
@@ -137,29 +149,33 @@ export class CosmiframeEitherSigner
     signerAddress: string,
     signDoc: DirectSignResponse['signed']
   ): Promise<DirectSignResponse> {
-    return callParentMethod<DirectSignResponse>(
-      {
-        method: 'signDirect',
-        params: [signerAddress, signDoc],
-        chainId: this.chainId,
-        signerType: 'direct',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<DirectSignResponse>(
+        {
+          method: 'signDirect',
+          params: [signerAddress, signDoc],
+          chainId: this.chainId,
+          signerType: 'direct',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 
   async signAmino(
     signerAddress: string,
     signDoc: StdSignDoc
   ): Promise<AminoSignResponse> {
-    return callParentMethod<AminoSignResponse>(
-      {
-        method: 'signAmino',
-        params: [signerAddress, signDoc],
-        chainId: this.chainId,
-        signerType: 'amino',
-      },
-      this.#allowedOrigins
-    )
+    return (
+      await callParentMethod<AminoSignResponse>(
+        {
+          method: 'signAmino',
+          params: [signerAddress, signDoc],
+          chainId: this.chainId,
+          signerType: 'amino',
+        },
+        this.#allowedOrigins
+      )
+    ).result
   }
 }
