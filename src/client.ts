@@ -11,6 +11,7 @@ import {
   InternalMethod,
   ListenOptions,
   MethodCallResultMessage,
+  Origin,
   ParentMetadata,
   RequestMethodCallMessage,
 } from './types'
@@ -18,6 +19,7 @@ import {
   UNSAFE_ALLOW_ANY_ORIGIN,
   callParentMethod,
   isInIframe,
+  isOriginAllowed,
   processOverrideHandler,
 } from './utils'
 
@@ -25,7 +27,7 @@ export class Cosmiframe {
   /**
    * Parent origins we are allowed to communicate with.
    */
-  #allowedOrigins: string[]
+  #allowedOrigins: Origin[]
 
   /**
    * Proxy object that can be used to call methods on the parent frame. This
@@ -46,7 +48,7 @@ export class Cosmiframe {
      * In order to allow all origins, you must explicitly pass in the string
      * `UNSAFE_ALLOW_ANY_ORIGIN`. Do not do this. It is very unsafe.
      */
-    allowedParentOrigins: string[]
+    allowedParentOrigins: Origin[]
   ) {
     if (!allowedParentOrigins.length) {
       throw new Error('You must explicitly allow parent origins.')
@@ -290,7 +292,7 @@ export class Cosmiframe {
       }
 
       // Verify origin is allowed.
-      if (!origins.includes('*') && !origins.includes(origin)) {
+      if (!isOriginAllowed(origins, origin)) {
         return
       }
 

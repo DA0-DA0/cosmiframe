@@ -7,6 +7,11 @@ import { OfflineDirectSigner } from '@cosmjs/proto-signing'
 export type SignerType = 'amino' | 'direct'
 
 /**
+ * The types of origins accepted.
+ */
+export type Origin = string | RegExp
+
+/**
  * A message sent from the iframe to the parent requesting a method be called.
  */
 export type RequestMethodCallMessage = {
@@ -159,7 +164,7 @@ export type ListenOptions = {
    * parent and is responsible for handling signing requests from the iframe.
    * The iframe, on the other hand, should not trust us.
    */
-  origins?: string[]
+  origins?: Origin[]
   /**
    * Optionally set a name and imageUrl that represent the parent window to be
    * shown by the iframe.

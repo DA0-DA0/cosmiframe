@@ -9,17 +9,18 @@ import {
   OfflineDirectSigner,
 } from '@cosmjs/proto-signing'
 
+import { Origin } from './types'
 import { callParentMethod } from './utils'
 
 export class CosmiframeDirectSigner implements OfflineDirectSigner {
   /**
    * Parent origins we are allowed to communicate with.
    */
-  #allowedOrigins: string[]
+  #allowedOrigins: Origin[]
 
   constructor(
     public chainId: string,
-    allowedParentOrigins: string[]
+    allowedParentOrigins: Origin[]
   ) {
     this.#allowedOrigins = allowedParentOrigins
   }
@@ -60,11 +61,11 @@ export class CosmiframeAminoSigner implements OfflineAminoSigner {
   /**
    * Parent origins we are allowed to communicate with.
    */
-  #allowedOrigins: string[]
+  #allowedOrigins: Origin[]
 
   constructor(
     public chainId: string,
-    allowedParentOrigins: string[]
+    allowedParentOrigins: Origin[]
   ) {
     this.#allowedOrigins = allowedParentOrigins
   }
@@ -107,11 +108,11 @@ export class CosmiframeEitherSigner
   /**
    * Parent origins we are allowed to communicate with.
    */
-  #allowedOrigins: string[]
+  #allowedOrigins: Origin[]
 
   constructor(
     public chainId: string,
-    allowedParentOrigins: string[]
+    allowedParentOrigins: Origin[]
   ) {
     this.#allowedOrigins = allowedParentOrigins
   }

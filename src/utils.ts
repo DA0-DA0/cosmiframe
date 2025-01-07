@@ -4,6 +4,7 @@ import { CosmiframeTimeoutError } from './error'
 import {
   CalledParentMethodResult,
   MethodCallResultMessageNoId,
+  Origin,
   OverrideHandler,
   RequestMethodCallMessageNoId,
 } from './types'
@@ -15,13 +16,13 @@ import {
 export const UNSAFE_ALLOW_ANY_ORIGIN = 'UNSAFE_ALLOW_ANY_ORIGIN'
 
 /**
- * Send message call request to parent of allowed origin and listen for the
- * result. Returns a promise that resolves with the result on success or rejects
- * with an error.
+ * Send message call request to parent and listen for the result, only accepting
+ * results from parents of allowed origins. Returns a promise that resolves with
+ * the result on success or rejects with an error.
  */
 export const callParentMethod = <T = any>(
   message: RequestMethodCallMessageNoId,
-  origins: string[],
+  origins: Origin[],
   /**
    * The timeout in milliseconds after which to reject the promise and stop
    * listening if the parent has not responded. If undefined, no timeout.
@@ -40,7 +41,7 @@ export const callParentMethod = <T = any>(
       // Verify we are receiving a response for the correct request from an
       // allowed parent.
       if (
-        (!origins.includes('*') && !origins.includes(origin)) ||
+        !isOriginAllowed(origins, origin) ||
         source !== window.parent ||
         data.id !== id
       ) {
@@ -73,8 +74,9 @@ export const callParentMethod = <T = any>(
         id,
       }
 
-      // Send the message to our parent of allowed origin.
-      origins.forEach((origin) => window.parent.postMessage(data, origin))
+      // Send the message to our parent of any origin. This is safe because we
+      // will only accept responses back from parents of allowed origins.
+      window.parent.postMessage(data, '*')
     } catch (err) {
       // If fails to send, remove the listener and reject.
       window.removeEventListener('message', listener)
@@ -122,3 +124,17 @@ export const processOverrideHandler = (
  */
 export const isInIframe = () =>
   typeof window !== 'undefined' && window.self !== window.parent
+
+/**
+ * Returns whether or not the origin is allowed.
+ */
+export const isOriginAllowed = (allowedOrigins: Origin[], origin: string) =>
+  allowedOrigins.some(
+    (allowed) =>
+      // Allow all origins.
+      allowed === '*' ||
+      // Allow a specific origin.
+      (typeof allowed === 'string' && origin === allowed) ||
+      // Allow an origin that matches a regular expression.
+      (allowed instanceof RegExp && allowed.test(origin))
+  )
