@@ -147,7 +147,10 @@ export type ListenOptions = {
   /**
    * Overrides applied to signer message requests.
    */
-  signerOverrides?: Overrides | (() => Overrides) | (() => Promise<Overrides>)
+  signerOverrides?:
+    | Overrides
+    | ((chainId: string) => Overrides)
+    | ((chainId: string) => Promise<Overrides>)
   /**
    * Restrict iframe origins that are allowed to connect to this listening
    * instance of Cosmiframe. If undefined or empty, all origins are allowed.

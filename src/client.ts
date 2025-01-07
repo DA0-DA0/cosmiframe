@@ -340,7 +340,7 @@ export class Cosmiframe {
           // Try signer override method.
           const overrides =
             typeof signerOverrides === 'function'
-              ? await signerOverrides()
+              ? await signerOverrides(chainId)
               : signerOverrides
           if (overrides && method in overrides) {
             const handledMsg = processOverrideHandler(
