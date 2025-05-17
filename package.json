@@ -17,8 +17,8 @@
   },
   "license": "BSD-3-Clause-Clear",
   "devDependencies": {
-    "@cosmjs/amino": "^0.32.3",
-    "@cosmjs/proto-signing": "^0.32.3",
+    "@cosmjs/amino": "^0.32.4",
+    "@cosmjs/proto-signing": "^0.32.4",
     "@keplr-wallet/types": "^0.12.83",
     "@swc/core": "^1.4.16",
     "@types/uuid": "^9.0.8",
@@ -37,7 +37,7 @@
     "uuid": "^9.0.1"
   },
   "peerDependencies": {
-    "@cosmjs/amino": ">= ^0.32",
-    "@cosmjs/proto-signing": ">= ^0.32"
+    "@cosmjs/amino": ">=^0.32.4",
+    "@cosmjs/proto-signing": ">=^0.32.4"
   }
 }
